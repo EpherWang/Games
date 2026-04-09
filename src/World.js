@@ -13,14 +13,28 @@ export class World {
   }
 
   setupLights() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xffb784, 0.22);
     this.scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(5, 10, 6);
+    const hemisphereLight = new THREE.HemisphereLight(0xffd7a8, 0x4a3b2c, 0.5);
+    this.scene.add(hemisphereLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffbe7a, 2.6);
+    directionalLight.position.set(18, 22, 18);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.set(2048, 2048);
+    directionalLight.shadow.camera.near = 1;
+    directionalLight.shadow.camera.far = 120;
+    directionalLight.shadow.camera.left = -40;
+    directionalLight.shadow.camera.right = 40;
+    directionalLight.shadow.camera.top = 35;
+    directionalLight.shadow.camera.bottom = -35;
+    directionalLight.shadow.bias = -0.00015;
+    directionalLight.shadow.normalBias = 0.018;
+    directionalLight.shadow.radius = 2.0;
+    directionalLight.target.position.set(0, 0, -60);
     this.scene.add(directionalLight);
+    this.scene.add(directionalLight.target);
   }
 
   createGround() {

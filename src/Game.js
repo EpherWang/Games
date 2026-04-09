@@ -10,13 +10,13 @@ import { InputController } from './InputController.js';
 import { ObstacleManager } from './ObstacleManager.js';
 import { CoinManager } from './Coin.js';
 import { ScoreSystem } from './ScoreSystem.js';
+import { EnvironmentManager } from './EnvironmentManager.js';
 
 export class Game {
   constructor(container) {
     this.container = container;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xffc38a);
 
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -63,6 +63,7 @@ export class Game {
     this.coinManager = new CoinManager(this.scene, this.player, () => {
       this.scoreSystem.addCoin();
     });
+    this.environmentManager = new EnvironmentManager(this.scene, this.player);
 
     this.loop = new GameLoop((deltaTime) => this.update(deltaTime));
 
@@ -83,6 +84,7 @@ export class Game {
     this.player.update(deltaTime);
     this.obstacleManager.update(deltaTime);
     this.coinManager.update(deltaTime);
+    this.environmentManager.update(deltaTime);
     this.updateCameraFollow();
     this.renderer.render(this.scene, this.camera);
   }

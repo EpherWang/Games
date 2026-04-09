@@ -4,6 +4,36 @@
  */
 import * as THREE from 'three';
 
+function createGroundTexture() {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#7f674d';
+  ctx.fillRect(0, 0, size, size);
+
+  for (let i = 0; i < 220; i += 1) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const radius = Math.random() * 1.7 + 0.3;
+    const value = 95 + Math.floor(Math.random() * 60);
+    ctx.fillStyle = `rgba(${value}, ${value - 8}, ${value - 18}, 0.24)`;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(8, 180);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  return texture;
+}
+
 export class World {
   constructor(scene) {
     this.scene = scene;
@@ -39,7 +69,12 @@ export class World {
 
   createGround() {
     const groundGeometry = new THREE.PlaneGeometry(20, 600);
-    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x2d3748 });
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x9f7f61,
+      roughness: 0.8,
+      metalness: 0.02,
+      map: createGroundTexture(),
+    });
 
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.rotation.x = -Math.PI / 2;

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { GameLoop } from './GameLoop.js';
 import { Player } from './Player.js';
 import { World } from './World.js';
+import { InputController } from './InputController.js';
 
 export class Game {
   constructor(container) {
@@ -31,6 +32,11 @@ export class Game {
     this.world = new World(this.scene);
     this.player = new Player();
     this.scene.add(this.player.mesh);
+
+    this.input = new InputController({
+      onMoveLeft: () => this.player.moveLeft(),
+      onMoveRight: () => this.player.moveRight(),
+    });
 
     this.cameraOffset = new THREE.Vector3(0, 5, 10);
     this.updateCameraFollow(true);

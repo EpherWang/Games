@@ -8,6 +8,8 @@ import { Player } from './Player.js';
 import { World } from './World.js';
 import { InputController } from './InputController.js';
 import { ObstacleManager } from './ObstacleManager.js';
+import { CoinManager } from './Coin.js';
+import { ScoreSystem } from './ScoreSystem.js';
 
 export class Game {
   constructor(container) {
@@ -49,6 +51,11 @@ export class Game {
     );
     this.updateCameraFollow(true);
 
+    this.scoreSystem = new ScoreSystem(document.body);
+    this.coinManager = new CoinManager(this.scene, this.player, () => {
+      this.scoreSystem.addCoin();
+    });
+
     this.loop = new GameLoop((deltaTime) => this.update(deltaTime));
 
     this.handleResize = this.handleResize.bind(this);
@@ -62,8 +69,12 @@ export class Game {
   update(deltaTime) {
     if (this.isGameOver) return;
 
+    this.scoreSystem.update(deltaTime);
+    this.player.speed = this.scoreSystem.getWorldSpeed();
+
     this.player.update(deltaTime);
     this.obstacleManager.update(deltaTime);
+    this.coinManager.update(deltaTime);
     this.updateCameraFollow();
     this.renderer.render(this.scene, this.camera);
   }

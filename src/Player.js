@@ -29,7 +29,11 @@ export class Player {
     this.groundY = 0.5; // 站立高度时，1x1x1 box 的中心点 y
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ color: 0x4fd1c5 });
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x43c4ba,
+      metalness: 0.2,
+      roughness: 0.42,
+    });
 
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.position.set(this.targetLaneX, this.groundY, 2);

@@ -7,6 +7,7 @@ import { GameLoop } from './GameLoop.js';
 import { Player } from './Player.js';
 import { World } from './World.js';
 import { InputController } from './InputController.js';
+import { ObstacleManager } from './ObstacleManager.js';
 
 export class Game {
   constructor(container) {
@@ -39,6 +40,13 @@ export class Game {
     });
 
     this.cameraOffset = new THREE.Vector3(0, 5, 10);
+
+    this.isGameOver = false;
+    this.obstacleManager = new ObstacleManager(
+      this.scene,
+      this.player,
+      () => this.handleGameOver(),
+    );
     this.updateCameraFollow(true);
 
     this.loop = new GameLoop((deltaTime) => this.update(deltaTime));
@@ -52,9 +60,20 @@ export class Game {
   }
 
   update(deltaTime) {
+    if (this.isGameOver) return;
+
     this.player.update(deltaTime);
+    this.obstacleManager.update(deltaTime);
     this.updateCameraFollow();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  handleGameOver() {
+    if (this.isGameOver) return;
+
+    this.isGameOver = true;
+    this.loop.stop();
+    console.log('Game Over');
   }
 
   updateCameraFollow(snap = false) {

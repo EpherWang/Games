@@ -72,6 +72,22 @@ export class Player {
     return this.mesh.position;
   }
 
+  getAABB() {
+    const halfX = 0.5 * this.mesh.scale.x;
+    const halfY = 0.5 * this.mesh.scale.y;
+    const halfZ = 0.5 * this.mesh.scale.z;
+    const { x, y, z } = this.mesh.position;
+
+    return {
+      minX: x - halfX,
+      maxX: x + halfX,
+      minY: y - halfY,
+      maxY: y + halfY,
+      minZ: z - halfZ,
+      maxZ: z + halfZ,
+    };
+  }
+
   handleActionKeyDown(event) {
     if (event.repeat) return;
 

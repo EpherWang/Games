@@ -8,6 +8,8 @@ import * as THREE from 'three';
 export class Player {
   constructor() {
     this.speed = 8; // 每秒前进速度（沿 -Z 方向）
+    this.baseSpeed = 8;
+    this.maxSpeed = 22;
     this.state = 'running'; // running | jumping | sliding
 
     // 三车道配置：0=左, 1=中, 2=右
@@ -31,6 +33,8 @@ export class Player {
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshStandardMaterial({
       color: 0x43c4ba,
+      emissive: 0x0a1f2b,
+      emissiveIntensity: 0.18,
       metalness: 0.2,
       roughness: 0.42,
     });
@@ -38,6 +42,14 @@ export class Player {
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.position.set(this.targetLaneX, this.groundY, 2);
     this.mesh.castShadow = true;
+    this.baseColor = new THREE.Color(0x43c4ba);
+    this.speedBoostColor = new THREE.Color(0x70b8ff);
+    this.baseEmissive = new THREE.Color(0x0a1f2b);
+    this.hitFlashColor = new THREE.Color(0xff4545);
+    this.fxMix = 0;
+    this.hitFlashTimer = 0;
+    this.hitFlashDuration = 0.28;
+    this.isHitFlashing = false;
 
     this.handleActionKeyDown = this.handleActionKeyDown.bind(this);
     window.addEventListener('keydown', this.handleActionKeyDown);
@@ -59,8 +71,12 @@ export class Player {
     this.targetLaneX = this.laneXPositions[this.laneIndex];
   }
 
-  update(deltaTime) {
-    this.mesh.position.z -= this.speed * deltaTime;
+  update(deltaTime, options = {}) {
+    const { freezeMovement = false } = options;
+
+    if (!freezeMovement) {
+      this.mesh.position.z -= this.speed * deltaTime;
+    }
 
     const lerpAlpha = 1 - Math.exp(-this.laneSwitchLerpSpeed * deltaTime);
     this.mesh.position.x = THREE.MathUtils.lerp(
@@ -69,7 +85,10 @@ export class Player {
       lerpAlpha,
     );
 
-    this.updateState(deltaTime);
+    if (!freezeMovement) {
+      this.updateState(deltaTime);
+    }
+    this.updateVisualFx(deltaTime);
   }
 
   getPosition() {
@@ -153,6 +172,38 @@ export class Player {
   restoreStandPose() {
     this.mesh.scale.y = this.standScaleY;
     this.mesh.position.y = this.groundY;
+  }
+
+  triggerCollisionFx() {
+    this.isHitFlashing = true;
+    this.hitFlashTimer = this.hitFlashDuration;
+  }
+
+  updateVisualFx(deltaTime) {
+    const speedRatio = THREE.MathUtils.clamp(
+      (this.speed - this.baseSpeed) / (this.maxSpeed - this.baseSpeed),
+      0,
+      1,
+    );
+    const pulse = Math.sin(performance.now() * 0.015) * 0.5 + 0.5;
+    this.fxMix = THREE.MathUtils.lerp(this.fxMix, speedRatio, 0.1);
+
+    this.mesh.material.color.copy(this.baseColor).lerp(this.speedBoostColor, this.fxMix * 0.6);
+    this.mesh.material.emissive.copy(this.baseEmissive).lerp(this.speedBoostColor, this.fxMix * 0.28);
+    this.mesh.material.emissiveIntensity = 0.18 + this.fxMix * 0.35 + pulse * this.fxMix * 0.1;
+
+    if (!this.isHitFlashing) return;
+
+    this.hitFlashTimer = Math.max(0, this.hitFlashTimer - deltaTime);
+    const hitProgress = 1 - this.hitFlashTimer / this.hitFlashDuration;
+    const blink = Math.sin(hitProgress * Math.PI * 10) > 0 ? 1 : 0.2;
+    this.mesh.material.color.lerp(this.hitFlashColor, 0.75 * blink);
+    this.mesh.material.emissive.copy(this.hitFlashColor);
+    this.mesh.material.emissiveIntensity = 0.8;
+
+    if (this.hitFlashTimer <= 0) {
+      this.isHitFlashing = false;
+    }
   }
 
   destroy() {

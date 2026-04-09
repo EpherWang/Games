@@ -13,6 +13,8 @@ export class Coin {
       emissiveIntensity: 0.35,
       metalness: 0.65,
       roughness: 0.3,
+      transparent: true,
+      opacity: 1,
     });
 
     this.mesh = new THREE.Mesh(geometry, material);
@@ -21,17 +23,51 @@ export class Coin {
     this.mesh.castShadow = true;
 
     this.isActive = false;
+    this.isCollecting = false;
+    this.collectFxTimer = 0;
+    this.collectFxDuration = 0.2;
+    this.baseScale = 1;
+    this.baseEmissiveIntensity = 0.35;
   }
 
   activate(laneX, z) {
     this.isActive = true;
+    this.isCollecting = false;
+    this.collectFxTimer = 0;
     this.mesh.visible = true;
     this.mesh.position.set(laneX, 1.1, z);
+    this.mesh.scale.setScalar(this.baseScale);
+    this.mesh.material.opacity = 1;
+    this.mesh.material.emissiveIntensity = this.baseEmissiveIntensity;
   }
 
   deactivate() {
     this.isActive = false;
+    this.isCollecting = false;
     this.mesh.visible = false;
+  }
+
+  startCollectFx() {
+    this.isCollecting = true;
+    this.collectFxTimer = this.collectFxDuration;
+  }
+
+  updateCollectFx(deltaTime) {
+    if (!this.isCollecting) return false;
+
+    this.collectFxTimer = Math.max(0, this.collectFxTimer - deltaTime);
+    const progress = 1 - this.collectFxTimer / this.collectFxDuration;
+    const scale = 1 + progress * 0.55;
+    this.mesh.scale.setScalar(scale);
+    this.mesh.material.opacity = 1 - progress;
+    this.mesh.material.emissiveIntensity = this.baseEmissiveIntensity + progress * 1.1;
+
+    if (this.collectFxTimer <= 0) {
+      this.isCollecting = false;
+      return true;
+    }
+
+    return false;
   }
 
   getAABB() {
@@ -114,8 +150,12 @@ export class CoinManager {
   }
 
   spinActiveCoins(deltaTime) {
-    for (let i = 0; i < this.activeCoins.length; i += 1) {
-      this.activeCoins[i].mesh.rotation.y += deltaTime * 8;
+    for (let i = this.activeCoins.length - 1; i >= 0; i -= 1) {
+      const coin = this.activeCoins[i];
+      coin.mesh.rotation.y += deltaTime * 8;
+      if (coin.updateCollectFx(deltaTime)) {
+        this.recycleCoin(i);
+      }
     }
   }
 
@@ -124,6 +164,7 @@ export class CoinManager {
 
     for (let i = this.activeCoins.length - 1; i >= 0; i -= 1) {
       const coin = this.activeCoins[i];
+      if (coin.isCollecting) continue;
       if (coin.mesh.position.z > playerZ + 8) {
         this.recycleCoin(i);
       }
@@ -135,10 +176,11 @@ export class CoinManager {
 
     for (let i = this.activeCoins.length - 1; i >= 0; i -= 1) {
       const coin = this.activeCoins[i];
+      if (coin.isCollecting) continue;
       const coinAABB = coin.getAABB();
       if (this.isAABBOverlap(playerAABB, coinAABB)) {
         this.onCollect?.();
-        this.recycleCoin(i);
+        coin.startCollectFx();
       }
     }
   }

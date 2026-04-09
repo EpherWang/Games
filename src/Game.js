@@ -52,6 +52,9 @@ export class Game {
     this.cameraOffset = new THREE.Vector3(0, 5, 10);
 
     this.isGameOver = false;
+    this.isDying = false;
+    this.gameOverTimer = 0;
+    this.gameOverDelay = 0.3;
     this.obstacleManager = new ObstacleManager(
       this.scene,
       this.player,
@@ -78,10 +81,26 @@ export class Game {
   update(deltaTime) {
     if (this.isGameOver) return;
 
+    if (this.isDying) {
+      this.gameOverTimer -= deltaTime;
+      this.player.update(deltaTime, { freezeMovement: true });
+      this.world.update(deltaTime, this.player.speed);
+      this.updateCameraFollow();
+      this.renderer.render(this.scene, this.camera);
+
+      if (this.gameOverTimer <= 0) {
+        this.isGameOver = true;
+        this.loop.stop();
+        console.log('Game Over');
+      }
+      return;
+    }
+
     this.scoreSystem.update(deltaTime);
     this.player.speed = this.scoreSystem.getWorldSpeed();
 
     this.player.update(deltaTime);
+    this.world.update(deltaTime, this.player.speed);
     this.obstacleManager.update(deltaTime);
     this.coinManager.update(deltaTime);
     this.environmentManager.update(deltaTime);
@@ -90,11 +109,11 @@ export class Game {
   }
 
   handleGameOver() {
-    if (this.isGameOver) return;
+    if (this.isGameOver || this.isDying) return;
 
-    this.isGameOver = true;
-    this.loop.stop();
-    console.log('Game Over');
+    this.isDying = true;
+    this.gameOverTimer = this.gameOverDelay;
+    this.player.triggerCollisionFx();
   }
 
   updateCameraFollow(snap = false) {

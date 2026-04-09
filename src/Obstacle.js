@@ -6,130 +6,129 @@ import * as THREE from 'three';
 
 const TYPE_CONFIG = {
   high: {
-    materialType: 'stone',
-    size: { x: 1.6, y: 1.6, z: 1.2 },
-    centerY: 1.4,
+    // 站立高度会撞上，下滑可通过
+    colliderSize: { x: 2.1, y: 0.7, z: 1.1 },
+    colliderCenterY: 1.1,
+    dangerColor: 0xff3b30,
   },
   low: {
-    materialType: 'wood',
-    size: { x: 1.6, y: 0.8, z: 1.2 },
-    centerY: 0.4,
+    // 地面阻挡，起跳可越过
+    colliderSize: { x: 1.9, y: 0.95, z: 1.3 },
+    colliderCenterY: 0.48,
+    dangerColor: 0xff8a1f,
   },
 };
 
-function applyRepeatUV(geometry, repeatX, repeatY) {
-  const uv = geometry.attributes.uv;
-  for (let i = 0; i < uv.count; i += 1) {
-    uv.setXY(i, uv.getX(i) * repeatX, uv.getY(i) * repeatY);
-  }
-  uv.needsUpdate = true;
-}
+const invisibleMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+});
 
-function createStoneTexture() {
-  const size = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
+const highFrameMaterial = new THREE.MeshStandardMaterial({
+  color: 0x6a737e,
+  roughness: 0.7,
+  metalness: 0.35,
+});
 
-  ctx.fillStyle = '#6b7280';
-  ctx.fillRect(0, 0, size, size);
+const highDangerMaterial = new THREE.MeshStandardMaterial({
+  color: TYPE_CONFIG.high.dangerColor,
+  emissive: TYPE_CONFIG.high.dangerColor,
+  emissiveIntensity: 0.85,
+  roughness: 0.38,
+  metalness: 0.18,
+});
 
-  for (let i = 0; i < 210; i += 1) {
-    const shade = 85 + Math.floor(Math.random() * 95);
-    ctx.fillStyle = `rgba(${shade}, ${shade}, ${shade + 2}, 0.32)`;
-    ctx.beginPath();
-    ctx.arc(
-      Math.random() * size,
-      Math.random() * size,
-      Math.random() * 2 + 0.4,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fill();
-  }
+const lowRockMaterial = new THREE.MeshStandardMaterial({
+  color: 0x4f3a30,
+  roughness: 0.88,
+  metalness: 0.04,
+});
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(1.8, 1.2);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-function createWoodTexture() {
-  const size = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#8a5d37';
-  ctx.fillRect(0, 0, size, size);
-
-  for (let y = 0; y < size; y += 6) {
-    const toneShift = (Math.random() * 34 - 17) | 0;
-    const r = 139 + toneShift;
-    const g = 92 + toneShift;
-    const b = 53 + toneShift;
-    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.55)`;
-    ctx.fillRect(0, y, size, 2);
-  }
-
-  for (let i = 0; i < 7; i += 1) {
-    const y = Math.random() * size;
-    const w = 12 + Math.random() * 24;
-    ctx.strokeStyle = 'rgba(70, 38, 18, 0.35)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(
-      Math.random() * size,
-      y,
-      w,
-      2.2 + Math.random() * 1.8,
-      0,
-      0,
-      Math.PI * 2,
-    );
-    ctx.stroke();
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(2.2, 1.3);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-const sharedGeometry = new THREE.BoxGeometry(1, 1, 1);
-applyRepeatUV(sharedGeometry, 1.6, 1.3);
-
-const sharedMaterials = {
-  stone: new THREE.MeshStandardMaterial({
-    color: 0x848b97,
-    map: createStoneTexture(),
-    roughness: 0.86,
-    metalness: 0.04,
-  }),
-  wood: new THREE.MeshStandardMaterial({
-    color: 0x99643a,
-    map: createWoodTexture(),
-    roughness: 0.76,
-    metalness: 0.03,
-  }),
-};
+const lowDangerMaterial = new THREE.MeshStandardMaterial({
+  color: TYPE_CONFIG.low.dangerColor,
+  emissive: TYPE_CONFIG.low.dangerColor,
+  emissiveIntensity: 0.95,
+  roughness: 0.32,
+  metalness: 0.05,
+});
 
 export class Obstacle {
   constructor() {
     this.type = 'low';
     this.active = false;
 
-    this.mesh = new THREE.Mesh(sharedGeometry, sharedMaterials.wood);
-
+    this.mesh = new THREE.Group();
     this.mesh.visible = false;
-    this.mesh.castShadow = true;
-    this.mesh.receiveShadow = true;
+
+    this.collider = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), invisibleMaterial);
+    this.collider.visible = false;
+    this.mesh.add(this.collider);
+
+    this.highGroup = this.createHighObstacle();
+    this.lowGroup = this.createLowObstacle();
+    this.mesh.add(this.highGroup);
+    this.mesh.add(this.lowGroup);
+
+    this.tmpWorldPos = new THREE.Vector3();
+  }
+
+  createHighObstacle() {
+    const group = new THREE.Group();
+
+    const sideGeo = new THREE.BoxGeometry(0.24, 1.6, 0.24);
+    const topGeo = new THREE.BoxGeometry(2.2, 0.36, 0.75);
+    const warningGeo = new THREE.BoxGeometry(2.2, 0.08, 0.2);
+
+    const leftPost = new THREE.Mesh(sideGeo, highFrameMaterial);
+    leftPost.position.set(-0.96, 0.8, 0);
+
+    const rightPost = new THREE.Mesh(sideGeo, highFrameMaterial);
+    rightPost.position.set(0.96, 0.8, 0);
+
+    const topBar = new THREE.Mesh(topGeo, highDangerMaterial);
+    topBar.position.set(0, 1.38, 0);
+
+    const warningStrip = new THREE.Mesh(warningGeo, highDangerMaterial);
+    warningStrip.position.set(0, 0.78, 0.36);
+
+    group.add(leftPost, rightPost, topBar, warningStrip);
+    group.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+
+    return group;
+  }
+
+  createLowObstacle() {
+    const group = new THREE.Group();
+
+    const baseGeo = new THREE.BoxGeometry(1.95, 0.56, 1.35);
+    const emberGeo = new THREE.BoxGeometry(1.65, 0.16, 1.02);
+    const coreGeo = new THREE.BoxGeometry(1.05, 0.24, 0.62);
+
+    const rockBase = new THREE.Mesh(baseGeo, lowRockMaterial);
+    rockBase.position.set(0, 0.28, 0);
+
+    const emberLayer = new THREE.Mesh(emberGeo, lowDangerMaterial);
+    emberLayer.position.set(0, 0.66, 0);
+
+    const hotCore = new THREE.Mesh(coreGeo, lowDangerMaterial);
+    hotCore.position.set(0, 0.86, 0);
+
+    group.add(rockBase, emberLayer, hotCore);
+    group.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+    });
+
+    return group;
   }
 
   activate(type, x, z) {
@@ -139,9 +138,16 @@ export class Obstacle {
     this.active = true;
     this.mesh.visible = true;
 
-    this.mesh.material = sharedMaterials[config.materialType] ?? sharedMaterials.wood;
-    this.mesh.scale.set(config.size.x, config.size.y, config.size.z);
-    this.mesh.position.set(x, config.centerY, z);
+    this.mesh.position.set(x, 0, z);
+    this.collider.scale.set(
+      config.colliderSize.x,
+      config.colliderSize.y,
+      config.colliderSize.z,
+    );
+    this.collider.position.set(0, config.colliderCenterY, 0);
+
+    this.highGroup.visible = type === 'high';
+    this.lowGroup.visible = type === 'low';
   }
 
   deactivate() {
@@ -150,10 +156,12 @@ export class Obstacle {
   }
 
   getAABB() {
-    const halfX = this.mesh.scale.x * 0.5;
-    const halfY = this.mesh.scale.y * 0.5;
-    const halfZ = this.mesh.scale.z * 0.5;
-    const { x, y, z } = this.mesh.position;
+    this.collider.getWorldPosition(this.tmpWorldPos);
+
+    const halfX = this.collider.scale.x * 0.5;
+    const halfY = this.collider.scale.y * 0.5;
+    const halfZ = this.collider.scale.z * 0.5;
+    const { x, y, z } = this.tmpWorldPos;
 
     return {
       minX: x - halfX,

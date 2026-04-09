@@ -20,7 +20,7 @@ export class ObstacleManager {
 
     this.activeObstacles = [];
     this.pool = [];
-    this.poolSize = 20;
+    this.poolSize = 24;
 
     this.spawnTimer = 0;
     this.nextSpawnInterval = this.randomBetween(
@@ -48,7 +48,7 @@ export class ObstacleManager {
         this.spawnIntervalMin,
         this.spawnIntervalMax,
       );
-      this.spawnObstacle();
+      this.spawnObstacleWave();
     }
 
     this.recyclePassedObstacles();
@@ -58,18 +58,56 @@ export class ObstacleManager {
     }
   }
 
-  spawnObstacle() {
+  spawnObstacleWave() {
+    if (this.pool.length === 0) return;
+
+    const playerZ = this.player.getPosition().z;
+    const baseSpawnZ =
+      playerZ - this.randomBetween(this.spawnDistanceMin, this.spawnDistanceMax);
+
+    const shouldSpawnCombo = Math.random() < 0.58;
+
+    if (!shouldSpawnCombo || this.pool.length < 2) {
+      const laneIndex = this.randomLaneIndex();
+      this.spawnAtLane(this.randomType(), laneIndex, baseSpawnZ);
+      return;
+    }
+
+    // 组合障碍：始终保留一条安全车道，保证可通过。
+    const safeLaneIndex = this.randomLaneIndex();
+    const blockedLaneIndices = [0, 1, 2].filter((idx) => idx !== safeLaneIndex);
+    const [typeA, typeB] = this.createComboTypes();
+
+    // 轻微前后错位，增强可读性但不造成不可能关卡。
+    const offsetA = this.randomBetween(-0.8, 0.8);
+    const offsetB = this.randomBetween(-0.8, 0.8);
+
+    this.spawnAtLane(typeA, blockedLaneIndices[0], baseSpawnZ + offsetA);
+    this.spawnAtLane(typeB, blockedLaneIndices[1], baseSpawnZ + offsetB);
+  }
+
+  spawnAtLane(type, laneIndex, z) {
     if (this.pool.length === 0) return;
 
     const obstacle = this.pool.pop();
-    const laneX = this.laneXPositions[Math.floor(Math.random() * this.laneXPositions.length)];
-    const type = Math.random() < 0.5 ? 'high' : 'low';
-    const playerZ = this.player.getPosition().z;
-    const spawnZ =
-      playerZ - this.randomBetween(this.spawnDistanceMin, this.spawnDistanceMax);
-
-    obstacle.activate(type, laneX, spawnZ);
+    const laneX = this.laneXPositions[laneIndex];
+    obstacle.activate(type, laneX, z);
     this.activeObstacles.push(obstacle);
+  }
+
+  createComboTypes() {
+    const roll = Math.random();
+    if (roll < 0.34) return ['high', 'low'];
+    if (roll < 0.68) return ['low', 'high'];
+    return Math.random() < 0.5 ? ['high', 'high'] : ['low', 'low'];
+  }
+
+  randomType() {
+    return Math.random() < 0.5 ? 'high' : 'low';
+  }
+
+  randomLaneIndex() {
+    return Math.floor(Math.random() * this.laneXPositions.length);
   }
 
   recyclePassedObstacles() {
